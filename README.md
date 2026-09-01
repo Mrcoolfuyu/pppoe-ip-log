@@ -20,13 +20,15 @@ system logs.
 - Monitors PPPoE interfaces automatically (or a fixed interface you choose).
 - Background daemon polls on a configurable interval and also reacts to
   hotplug `iface` events for immediate logging.
-- **Public IP discovery (CGNAT-friendly):** besides the local interface address,
-  the public-facing IPv4 address can be fetched from an external echo service,
-  so the log is meaningful even when the WAN only sees a carrier-grade NAT
-  address (100.64.0.0/10). Both values are recorded and shown in the UI.
+- **Public IP discovery (CGNAT-friendly, off by default):** besides the local
+  interface address, the public-facing IPv4 address can be fetched from an
+  external echo service, so the log is meaningful even when the WAN only sees a
+  carrier-grade NAT address (100.64.0.0/10). Both values are recorded, and the
+  public-address columns are shown only while the option is enabled.
 - Web UI under **Network → PPPoE IP Log** with a current-status panel and a
   change-history table, plus a "Clear log" action.
-- The installed package version is shown in the page title (e.g. `v1.0-r4`).
+- The change history lists the address after each change (no old/new pairing).
+- The installed package version is shown in the page title (e.g. `v1.0-r6`).
 - Simplified Chinese translation included (`luci-i18n-pppoe-ip-log-zh-cn`).
 
 ## Installation
@@ -54,7 +56,7 @@ Settings (Network → PPPoE IP Log → Settings):
 | `interface` | `auto`  | `auto` = all PPPoE interfaces; otherwise a space-separated list (e.g. `wan`). |
 | `interval`  | `30`    | Daemon poll interval in seconds.                                 |
 | `max_entries` | `500` | Maximum number of history lines kept (oldest are trimmed).     |
-| `public_ip_lookup` | `1` | Also query an external echo service for the public-facing IPv4 address (CGNAT-friendly). Set to `0` to log the interface address only. |
+| `public_ip_lookup` | `0` | Also query an external echo service for the public-facing IPv4 address (CGNAT-friendly). Disabled by default; while it is off the UI hides the public-address columns and only the interface address is logged. |
 | `echo_url` | several | One or more URLs (list) that return the caller IPv4 as plain text; tried in order until one succeeds. |
 
 ## How it works
@@ -65,9 +67,9 @@ Settings (Network → PPPoE IP Log → Settings):
   whenever an interface comes up.
 - The procd init script (`/etc/init.d/pppoe-ip-log`) launches the daemon.
 - Data is stored in `/etc/pppoe-ip-log/`:
-  - `history.log` — tab-separated change records (`epoch<TAB>time<TAB>iface<TAB>old_public<TAB>new_public<TAB>old_interface<TAB>new_interface`).
-  - `state` — last known interface and public address per interface.
-  - `status.json` — current status consumed by the web UI (`address` = interface IP, `public_address` = public-facing IP, `version` = installed package version).
+  - `history.log` — tab-separated change records (`epoch<TAB>time<TAB>iface<TAB>old_public<TAB>new_public<TAB>old_interface<TAB>new_interface`). A `-` is written for unavailable values, and the UI displays only the post-change (new) addresses.
+  - `state` — last known interface and public address per interface (`-` when unknown; the placeholder keeps the column layout stable).
+  - `status.json` — current status consumed by the web UI (`address` = interface IP, `public_address` = public-facing IP, `public_lookup` = whether public-IP discovery is enabled, `version` = installed package version).
 
 ## Building from source (OpenWrt SDK)
 
@@ -81,7 +83,7 @@ make package/luci-app-pppoe-ip-log/compile V=s
 ```
 
 The build produces two `.ipk` files whose names embed the version and
-architecture (e.g. `luci-app-pppoe-ip-log_1.0-r4_x86_64.ipk`):
+architecture (e.g. `luci-app-pppoe-ip-log_1.0-r6_x86_64.ipk`):
 
 - `luci-app-pppoe-ip-log_*.ipk` — the application (English strings).
 - `luci-i18n-pppoe-ip-log-zh-cn_*.ipk` — Simplified Chinese translation

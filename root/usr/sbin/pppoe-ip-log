@@ -196,17 +196,22 @@ log_change() {
 status_write() {
 	# $1 = unix timestamp of this run, $2 = temp file with "iface ifaddr pubaddr ts" lines
 	local now="$1" entries="$2" tmp="$STATUS_FILE.tmp" out first=1 iface ifaddr pubaddr ts
-	local ver="$(pkg_version)"
+	local ver="$(pkg_version)" pl=0 pa
 
-	out="{\"now\":$now,\"version\":\"$ver\",\"interfaces\":["
+	# Tell the UI whether the public-address columns should be shown at all.
+	[ "$(conf_get public_ip_lookup)" != "0" ] && pl=1
+
+	out="{\"now\":$now,\"version\":\"$ver\",\"public_lookup\":$pl,\"interfaces\":["
 	while read -r iface ifaddr pubaddr ts; do
 		[ -n "$iface" ] || continue
+		pa="$pubaddr"
+		[ "$pa" = "-" ] && pa=""
 		[ "$first" = "1" ] || out="$out,"
 		first=0
 		if [ -z "$ifaddr" ] || [ "$ifaddr" = "-" ]; then
 			out="$out{\"interface\":\"$iface\",\"address\":\"\",\"public_address\":\"\",\"changed\":0,\"changed_str\":\"-\",\"up\":false}"
 		else
-			out="$out{\"interface\":\"$iface\",\"address\":\"$ifaddr\",\"public_address\":\"$pubaddr\",\"changed\":${ts:-0},\"changed_str\":\"$(fmt_ts "$ts")\",\"up\":true}"
+			out="$out{\"interface\":\"$iface\",\"address\":\"$ifaddr\",\"public_address\":\"$pa\",\"changed\":${ts:-0},\"changed_str\":\"$(fmt_ts "$ts")\",\"up\":true}"
 		fi
 	done < "$entries"
 	out="$out]}"
@@ -218,7 +223,7 @@ status_write() {
 # --- actions ---------------------------------------------------------------
 
 do_check() {
-	local now iface ifaddr old_if old_pub old_ts pubaddr entries="$DATA_DIR/.entries.tmp"
+	local now iface ifaddr old_if old_pub old_ts pubaddr new_pub entries="$DATA_DIR/.entries.tmp"
 
 	mkdir -p "$DATA_DIR"
 	: > "$entries"
@@ -227,8 +232,15 @@ do_check() {
 	network_flush_cache
 
 	# The public address is per-router, not per-interface, so query it once.
-	pubaddr=""
-	[ "$(conf_get public_ip_lookup)" != "0" ] && pubaddr="$(public_ip)"
+	# When the lookup is disabled (or every echo URL fails) use "-" as a
+	# placeholder: an empty field would collapse this column in the state and
+	# entries files, shifting the timestamp into the public-address slot.
+	pubaddr="-"
+	if [ "$(conf_get public_ip_lookup)" != "0" ]; then
+		local pip
+		pip="$(public_ip)"
+		[ -n "$pip" ] && pubaddr="$pip"
+	fi
 
 	for iface in $(monitored_interfaces); do
 		ifaddr="$(interface_ip "$iface")"
@@ -256,8 +268,12 @@ do_check() {
 			old_pub="$(printf '%s' "$sline" | awk '{print $3}')"
 			old_ts="$(printf '%s' "$sline" | awk '{print $4}')"
 		fi
+		[ "$old_pub" = "-" ] && old_pub=""
 
-		if [ "$ifaddr" != "$old_if" ] || [ "$pubaddr" != "$old_pub" ]; then
+		new_pub="$pubaddr"
+		[ "$new_pub" = "-" ] && new_pub=""
+
+		if [ "$ifaddr" != "$old_if" ] || [ "$new_pub" != "$old_pub" ]; then
 			log_change "$iface" "$old_if" "$old_pub" "$ifaddr" "$pubaddr" "$now"
 			state_update "$iface" "$ifaddr" "$pubaddr" "$now"
 			old_ts="$now"

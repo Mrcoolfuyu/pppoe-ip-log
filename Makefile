@@ -4,7 +4,7 @@ LUCI_NAME:=luci-app-pppoe-ip-log
 
 PKG_NAME:=$(LUCI_NAME)
 PKG_VERSION:=1.0
-PKG_RELEASE:=5
+PKG_RELEASE:=7
 
 PKG_MAINTAINER:=WorkBuddy
 PKG_LICENSE:=Apache-2.0

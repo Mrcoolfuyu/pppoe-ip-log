@@ -61,8 +61,9 @@ return view.extend({
 
 		o = s.option(form.Flag, 'public_ip_lookup', _('Query public IP address'),
 			_('Also discover the public-facing IPv4 address from an external echo service. ' +
-			  'Useful when the WAN sits behind carrier-grade NAT (CGNAT) and only a 100.64.0.0/10 address is visible locally.'));
-		o.default = '1';
+			  'Useful when the WAN sits behind carrier-grade NAT (CGNAT) and only a 100.64.0.0/10 address is visible locally. ' +
+			  'Disabled by default; the public address columns are only shown while this is enabled.'));
+		o.default = '0';
 		o.rmempty = false;
 
 		o = s.option(form.DynamicList, 'echo_url', _('Public IP echo URL(s)'),

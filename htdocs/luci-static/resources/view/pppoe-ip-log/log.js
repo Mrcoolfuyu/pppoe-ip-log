@@ -100,71 +100,79 @@ return view.extend({
 		]);
 	},
 
-	renderStatus: function (status) {
+	renderStatus: function (status, showPub) {
 		var ifaces = (status && status.interfaces) || [],
 		    now = status ? status.now : 0,
-		    tbl = table([
-				_('Interface'),
-				_('Current address'),
-				_('Public address'),
-				_('Since'),
-				_('Held for')
-			]),
-		    i, it, held;
+		    headers = [ _('Interface'), _('Current address') ],
+		    tbl, i, it, held;
+
+		if (showPub)
+			headers.push(_('Public address'));
+
+		headers.push(_('Since'));
+		headers.push(_('Held for'));
+
+		tbl = table(headers);
 
 		if (ifaces.length === 0)
-			return emptyRow(tbl, 5, _('No data available.'));
+			return emptyRow(tbl, headers.length, _('No data available.'));
 
 		for (i = 0; i < ifaces.length; i++) {
 			it = ifaces[i];
 			held = (now && it.changed) ? humanDuration(now - it.changed) : null;
 
-			tbl.appendChild(E('tr', { 'class': 'tr' }, [
+			var cells = [
 				E('td', { 'class': 'td' }, it.interface || '-'),
 				E('td', { 'class': 'td' }, it.up ?
 					E('strong', {}, it.address || '-') :
-					E('em', {}, _('no address'))),
-				E('td', { 'class': 'td' }, (it.up && it.public_address) ?
-					it.public_address : E('em', {}, _('unknown'))),
-				E('td', { 'class': 'td' }, (it.up && it.changed_str) ? it.changed_str : '-'),
-				E('td', { 'class': 'td' }, (it.up && held) ? held : '-')
-			]));
+					E('em', {}, _('no address')))
+			];
+
+			if (showPub)
+				cells.push(E('td', { 'class': 'td' }, (it.up && it.public_address) ?
+					it.public_address : E('em', {}, _('unknown'))));
+
+			cells.push(E('td', { 'class': 'td' }, (it.up && it.changed_str) ? it.changed_str : '-'));
+			cells.push(E('td', { 'class': 'td' }, (it.up && held) ? held : '-'));
+
+			tbl.appendChild(E('tr', { 'class': 'tr' }, cells));
 		}
 
 		return tbl;
 	},
 
-	renderHistory: function (rows) {
-		var tbl = table([
-				_('Time'),
-				_('Interface'),
-				_('Previous public'),
-				_('New public'),
-				_('Interface IP')
-			]),
-		    i, r, ifText;
+	renderHistory: function (rows, showPub) {
+		var headers = [ _('Time'), _('Interface') ],
+		    tbl, i, r;
+
+		if (showPub)
+			headers.push(_('Public address'));
+
+		headers.push(_('Address'));
+
+		tbl = table(headers);
 
 		if (rows.length === 0)
-			return emptyRow(tbl, 6, _('No address changes have been recorded yet.'));
+			return emptyRow(tbl, headers.length, _('No address changes have been recorded yet.'));
 
 		/* newest first */
 		for (i = rows.length - 1; i >= 0; i--) {
 			r = rows[i];
-			ifText = [
-				(r.prevIf && r.prevIf !== '-') ? r.prevIf : _('none'),
-				' → ',
-				r.nextIf || '-'
+
+			var cells = [
+				E('td', { 'class': 'td' }, r.time || '-'),
+				E('td', { 'class': 'td' }, r.iface || '-')
 			];
 
-			tbl.appendChild(E('tr', { 'class': 'tr' }, [
-				E('td', { 'class': 'td' }, r.time || '-'),
-				E('td', { 'class': 'td' }, r.iface || '-'),
-				E('td', { 'class': 'td' }, (r.prevPub && r.prevPub !== '-') ?
-					r.prevPub : E('em', {}, _('unknown'))),
-				E('td', { 'class': 'td' }, E('strong', {}, (r.nextPub && r.nextPub !== '-') ?
-					r.nextPub : E('em', {}, _('unknown')))),
-				E('td', { 'class': 'td' }, ifText)
-			]));
+			if (showPub)
+				cells.push(E('td', { 'class': 'td' }, (r.nextPub && r.nextPub !== '-') ?
+					E('strong', {}, r.nextPub) : '-'));
+
+			/* only the new (post-change) address is shown */
+			cells.push(E('td', { 'class': 'td' },
+				E('strong', {}, (r.nextIf && r.nextIf !== '-') ? r.nextIf : '-')));
+
+			tbl.appendChild(E('tr', { 'class': 'tr' }, cells));
 		}
 
 		return tbl;
@@ -172,7 +180,8 @@ return view.extend({
 
 	render: function (data) {
 		var status = null,
-		    rows = parseLog(data[1]);
+		    rows = parseLog(data[1]),
+		    showPub;
 
 		try {
 			status = JSON.parse(data[0]);
@@ -180,16 +189,19 @@ return view.extend({
 			status = null;
 		}
 
+		/* only show public-address columns when the lookup is enabled */
+		showPub = !!(status && status.public_lookup);
+
 		var body = E('div', { 'class': 'cbi-map' }, [
 			E('h2', {}, _('PPPoE IP Log') +
 				((status && status.version) ? ('  (v' + status.version + ')') : '')),
 			E('div', { 'class': 'cbi-section' }, [
 				E('h3', {}, _('Current status')),
-				E('div', { 'id': 'pipl-status' }, this.renderStatus(status))
+				E('div', { 'id': 'pipl-status' }, this.renderStatus(status, showPub))
 			]),
 			E('div', { 'class': 'cbi-section' }, [
 				E('h3', {}, _('Address change history')),
-				E('div', { 'id': 'pipl-history' }, this.renderHistory(rows)),
+				E('div', { 'id': 'pipl-history' }, this.renderHistory(rows, showPub)),
 				E('div', { 'style': 'margin-top:1em' }, [
 					E('button', {
 						'class': 'cbi-button cbi-button-neutral',
@@ -216,7 +228,8 @@ return view.extend({
 			fs.read(STATUS_PATH).catch(function () { return null; }),
 			fs.read(LOG_PATH).catch(function () { return ''; })
 		]).then(function (data) {
-			var status = null;
+			var status = null,
+			    showPub;
 
 			try {
 				status = JSON.parse(data[0]);
@@ -224,17 +237,19 @@ return view.extend({
 				status = null;
 			}
 
+			showPub = !!(status && status.public_lookup);
+
 			var oldStatus = document.getElementById('pipl-status'),
 			    oldHistory = document.getElementById('pipl-history');
 
 			if (oldStatus && oldStatus.appendChild) {
 				oldStatus.innerHTML = '';
-				oldStatus.appendChild(self.renderStatus(status));
+				oldStatus.appendChild(self.renderStatus(status, showPub));
 			}
 
 			if (oldHistory && oldHistory.appendChild) {
 				oldHistory.innerHTML = '';
-				oldHistory.appendChild(self.renderHistory(parseLog(data[1])));
+				oldHistory.appendChild(self.renderHistory(parseLog(data[1]), showPub));
 			}
 		});
 	},

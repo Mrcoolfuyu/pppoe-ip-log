@@ -13,9 +13,10 @@
 - 记录每次变化的 时间、旧地址、新地址。
 - 自动监控 PPPoE 接口（或你指定的固定接口）。
 - 后台守护进程按可配置间隔轮询，并对 hotplug `iface` 事件即时记录。
-- **公网地址探测（兼容 CGNAT）**：除本地接口地址外，还可从外部 echo 服务获取真实对公 IPv4 地址，因此即便 WAN 只能看到运营商级 NAT 地址（100.64.0.0/10）也能记录有效信息。两个值都会被记录并在界面中展示。
+- **公网地址探测（兼容 CGNAT，默认关闭）**：除本地接口地址外，还可从外部 echo 服务获取真实对公 IPv4 地址，因此即便 WAN 只能看到运营商级 NAT 地址（100.64.0.0/10）也能记录有效信息。两个值都会被记录；仅当开启该选项时，界面才显示公网地址列。
 - Web 界面位于 **网络 → PPPoE IP Log**，包含当前状态面板、变更历史表格，以及“清空日志”操作。
-- 界面标题处显示当前已安装版本号（如 `v1.0-r4`）。
+- 变更历史只展示每次变更后的新地址（不再区分旧/新地址）。
+- 界面标题处显示当前已安装版本号（如 `v1.0-r6`）。
 - 内置简体中文翻译（`luci-i18n-pppoe-ip-log-zh-cn`）。
 
 ## 安装
@@ -42,7 +43,7 @@ opkg install luci-i18n-pppoe-ip-log-zh-cn
 | `interface` | `auto` | `auto` = 所有 PPPoE 接口；否则为空格分隔的接口列表（如 `wan`）。 |
 | `interval` | `30` | 守护进程轮询间隔（秒）。 |
 | `max_entries` | `500` | 保留的历史最大行数（超出后裁剪最旧记录）。 |
-| `public_ip_lookup` | `1` | 是否额外查询外部 echo 服务获取真实对公 IPv4 地址（兼容 CGNAT）。设为 `0` 则只记录接口地址。 |
+| `public_ip_lookup` | `0` | 是否额外查询外部 echo 服务获取真实对公 IPv4 地址（兼容 CGNAT）。默认关闭；关闭时界面隐藏公网地址列，只记录接口地址。 |
 | `echo_url` | 多个 | 一个或多个以纯文本返回调用方 IPv4 的 URL（列表）；按顺序尝试直到成功。 |
 
 ## 工作原理
@@ -51,9 +52,9 @@ opkg install luci-i18n-pppoe-ip-log-zh-cn
 - hotplug 脚本（`/etc/hotplug.d/iface/95-pppoe-ip-log`）在接口 up 时触发一次检查。
 - procd 初始化脚本（`/etc/init.d/pppoe-ip-log`）启动守护进程。
 - 数据存放在 `/etc/pppoe-ip-log/`：
-  - `history.log` — 制表符分隔的变更记录（`epoch<TAB>time<TAB>iface<TAB>old_public<TAB>new_public<TAB>old_interface<TAB>new_interface`）。
-  - `state` — 每个接口最后一次已知的接口地址与公网地址。
-  - `status.json` — 供 Web 界面消费的当前状态（`address` = 接口 IP，`public_address` = 对公 IP，`version` = 已安装版本号）。
+  - `history.log` — 制表符分隔的变更记录（`epoch<TAB>time<TAB>iface<TAB>old_public<TAB>new_public<TAB>old_interface<TAB>new_interface`）。取值不可用时写入 `-`，界面只展示变更后的新地址。
+  - `state` — 每个接口最后一次已知的接口地址与公网地址（未知时写 `-`，占位符用于保持列结构稳定）。
+  - `status.json` — 供 Web 界面消费的当前状态（`address` = 接口 IP，`public_address` = 对公 IP，`public_lookup` = 是否启用公网探测，`version` = 已安装版本号）。
 
 ## 从源码编译（OpenWrt SDK）
 
@@ -65,7 +66,7 @@ opkg install luci-i18n-pppoe-ip-log-zh-cn
 make package/luci-app-pppoe-ip-log/compile V=s
 ```
 
-编译产物包含两个 `.ipk` 文件，文件名中带有版本号与架构（例如 `luci-app-pppoe-ip-log_1.0-r4_x86_64.ipk`）：
+编译产物包含两个 `.ipk` 文件，文件名中带有版本号与架构（例如 `luci-app-pppoe-ip-log_1.0-r6_x86_64.ipk`）：
 
 - `luci-app-pppoe-ip-log_*.ipk` — 应用本体（英文字符串）。
 - `luci-i18n-pppoe-ip-log-zh-cn_*.ipk` — 简体中文翻译（由 `po/zh_Hans` 自动生成）。
