@@ -1,0 +1,133 @@
+msgid ""
+msgstr ""
+"PO-Revision-Date: 2026-09-01 08:30+0000\n"
+"Last-Translator: WorkBuddy <workbuddy@local>\n"
+"Language-Team: Chinese (Simplified Han script)\n"
+"Language: zh_Hans\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: root/usr/share/luci/menu.d/luci-app-pppoe-ip-log.json:3
+msgid "PPPoE IP Log"
+msgstr "PPPoE IP 日志"
+
+#: root/usr/share/luci/menu.d/luci-app-pppoe-ip-log.json:13
+msgid "IP Change Log"
+msgstr "IP 变更记录"
+
+#: root/usr/share/luci/menu.d/luci-app-pppoe-ip-log.json:25
+msgid "Settings"
+msgstr "设置"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:91
+msgid "Interface"
+msgstr "接口"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:93
+msgid "Current address"
+msgstr "当前地址"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:94
+msgid "Since"
+msgstr "起始时间"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:95
+msgid "Held for"
+msgstr "已保持"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:100
+msgid "No data available."
+msgstr "暂无数据。"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:110
+msgid "no address"
+msgstr "无地址"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:121
+msgid "Time"
+msgstr "时间"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:123
+msgid "Previous address"
+msgstr "原地址"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:124
+msgid "New address"
+msgstr "新地址"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:129
+msgid "No address changes have been recorded yet."
+msgstr "尚未记录到任何地址变更。"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:137
+msgid "none"
+msgstr "无"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:158
+msgid "Current status"
+msgstr "当前状态"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:162
+msgid "Address change history"
+msgstr "地址变更历史"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:168
+msgid "Refresh now"
+msgstr "立即刷新"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:173
+msgid "Clear log"
+msgstr "清空日志"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:217
+msgid "Delete all recorded IP address changes? The current address will be recorded again immediately."
+msgstr "确定删除所有已记录的 IP 地址变更吗？当前地址会被立即重新记录一次。"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:221
+msgid "Cancel"
+msgstr "取消"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:227
+msgid "Clear"
+msgstr "清空"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:239
+msgid "Unable to clear the log:"
+msgstr "无法清空日志："
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:11
+msgid "Automatic (all PPPoE interfaces)"
+msgstr "自动（所有 PPPoE 接口）"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:37
+msgid "Record the public IP address of the monitored PPPoE interfaces whenever it changes."
+msgstr "在被监控的 PPPoE 接口公网地址发生变化时记录其变更。"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:41
+msgid "General settings"
+msgstr "常规设置"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:44
+msgid "Enable logging"
+msgstr "启用记录"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:49
+msgid "Monitored interface"
+msgstr "监控接口"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:54
+msgid "Poll interval"
+msgstr "检测间隔"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:55
+msgid "How often the current address is compared, in seconds."
+msgstr "对比当前地址的频率，单位为秒。"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:60
+msgid "Maximum log entries"
+msgstr "最大日志条数"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:61
+msgid "The oldest entries are discarded when this limit is reached. Use 0 for unlimited."
+msgstr "达到该上限后最早的条目会被丢弃。填 0 表示不限制。"

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Record a possible address change as soon as an interface comes up.
+# Installed as /etc/hotplug.d/iface/95-pppoe-ip-log
+
+[ "$ACTION" = "ifup" ] || exit 0
+[ "$(uci -q get pppoe-ip-log.main.enabled)" = "0" ] && exit 0
+
+# give netifd a moment to publish the new address on ubus
+( sleep 3; /usr/sbin/pppoe-ip-log check ) &
+
+exit 0

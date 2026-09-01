@@ -1,0 +1,14 @@
+# Build artifacts
+*.ipk
+.ipk*
+
+# Editor / OS junk
+.DS_Store
+*.swp
+*~
+*.bak
+
+# Local in-tree build artifacts
+tmp/
+bin/
+build_dir/

@@ -1,0 +1,5 @@
+config settings 'main'
+	option enabled '1'
+	option interface 'auto'
+	option interval '30'
+	option max_entries '500'

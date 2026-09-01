@@ -1,0 +1,43 @@
+#!/bin/sh /etc/rc.common
+# pppoe-ip-log - PPPoE public IP change logger (procd service)
+
+START=95
+STOP=10
+
+USE_PROCD=1
+
+PROG=/usr/sbin/pppoe-ip-log
+
+EXTRA_COMMANDS="check clear"
+EXTRA_HELP="	check	Check the monitored interfaces right now
+	clear	Delete the recorded IP change history"
+
+start_service() {
+	[ "$(uci -q get pppoe-ip-log.main.enabled)" = "0" ] && return 0
+
+	procd_open_instance
+	procd_set_param command "$PROG" daemon
+	procd_set_param respawn 3600 5 5
+	procd_set_param file /etc/config/pppoe-ip-log
+	procd_close_instance
+}
+
+stop_service() {
+	rm -f /var/run/pppoe-ip-log.pid
+}
+
+service_triggers() {
+	procd_add_reload_trigger pppoe-ip-log
+}
+
+reload_service() {
+	restart
+}
+
+check() {
+	"$PROG" check
+}
+
+clear() {
+	"$PROG" clear
+}

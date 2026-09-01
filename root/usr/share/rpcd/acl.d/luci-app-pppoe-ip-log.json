@@ -1,0 +1,21 @@
+{
+	"luci-app-pppoe-ip-log": {
+		"description": "Grant access to the PPPoE IP log data and configuration",
+	"read": {
+		"file": {
+			"/etc/pppoe-ip-log/*": [ "read" ]
+		},
+		"uci": [ "pppoe-ip-log", "network" ]
+	},
+	"write": {
+		"uci": [ "pppoe-ip-log" ],
+		"exec": {
+			"/usr/sbin/pppoe-ip-log clear": [ "exec" ],
+			"/usr/sbin/pppoe-ip-log interfaces": [ "exec" ],
+			"/usr/sbin/pppoe-ip-log check": [ "exec" ],
+			"/usr/sbin/pppoe-ip-log status": [ "exec" ],
+			"/etc/init.d/pppoe-ip-log restart": [ "exec" ]
+		}
+	}
+	}
+}

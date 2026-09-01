@@ -1,0 +1,250 @@
+#!/bin/sh
+# pppoe-ip-log - record public IP address changes of PPPoE / WAN interfaces
+#
+# Records the time, the previous address and the new address whenever the
+# public IPv4 address of a monitored (PPPoE) interface changes.
+#
+# Copyright (C) 2026  WorkBuddy
+# Released under the Apache License, Version 2.0
+
+. /lib/functions.sh
+. /lib/functions/network.sh
+
+NAME="pppoe-ip-log"
+UCI_CFG="pppoe-ip-log"
+DATA_DIR="/etc/pppoe-ip-log"
+LOG_FILE="$DATA_DIR/history.log"
+STATE_FILE="$DATA_DIR/state"
+STATUS_FILE="$DATA_DIR/status.json"
+LOCK_DIR="/var/lock/$NAME"
+LOCK_TRIES=60
+
+conf_get() {
+	uci -q get "$UCI_CFG.main.$1" 2>/dev/null
+}
+
+is_enabled() {
+	[ "$(conf_get enabled)" != "0" ]
+}
+
+lock_acquire() {
+	local i=0
+	while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+		i=$((i + 1))
+		[ "$i" -ge "$LOCK_TRIES" ] && return 1
+		sleep 1
+	done
+	return 0
+}
+
+lock_release() {
+	rmdir "$LOCK_DIR" 2>/dev/null
+}
+
+# --- interface selection ---------------------------------------------------
+
+pppoe_iface_cb() {
+	local proto
+	config_get proto "$1" proto
+	[ "$proto" = "pppoe" ] && echo "$1"
+}
+
+monitored_interfaces() {
+	local cfg iface found
+
+	cfg="$(conf_get interface)"
+	if [ -n "$cfg" ] && [ "$cfg" != "auto" ]; then
+		for iface in $cfg; do
+			[ -n "$iface" ] && echo "$iface"
+		done
+		return 0
+	fi
+
+	found="$(config_load network; config_foreach pppoe_iface_cb interface)"
+	if [ -n "$found" ]; then
+		echo "$found"
+		return 0
+	fi
+
+	# nothing detected - fall back to the default WAN interface
+	echo "wan"
+}
+
+# --- helpers ---------------------------------------------------------------
+
+interface_ip() {
+	local addr=""
+	network_get_ipaddr addr "$1" 2>/dev/null
+	[ -n "$addr" ] && echo "$addr"
+}
+
+state_field() {
+	# $1 = interface, $2 = field (2 = address, 3 = unix timestamp)
+	[ -f "$STATE_FILE" ] || return 0
+	awk -v iface="$1" -v field="$2" '$1 == iface { print $field; exit }' "$STATE_FILE"
+}
+
+state_update() {
+	local iface="$1" addr="$2" ts="$3" tmp="$STATE_FILE.tmp"
+
+	if [ -f "$STATE_FILE" ]; then
+		grep -v "^$iface " "$STATE_FILE" > "$tmp" 2>/dev/null
+	else
+		: > "$tmp"
+	fi
+	printf '%s %s %s\n' "$iface" "$addr" "$ts" >> "$tmp"
+	mv "$tmp" "$STATE_FILE"
+}
+
+fmt_ts() {
+	local ts="$1" out
+	out="$(date -d "@$ts" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)"
+	[ -n "$out" ] || out="-"
+	echo "$out"
+}
+
+trim_log() {
+	local max lines
+	max="$(conf_get max_entries)"
+	case "$max" in
+		''|*[!0-9]*) max=500 ;;
+	esac
+	[ "$max" -gt 0 ] || return 0
+	[ -f "$LOG_FILE" ] || return 0
+
+	lines=$(wc -l < "$LOG_FILE" 2>/dev/null)
+	case "$lines" in
+		''|*[!0-9]*) return 0 ;;
+	esac
+	[ "$lines" -gt "$max" ] || return 0
+
+	tail -n "$max" "$LOG_FILE" > "$LOG_FILE.tmp" && mv "$LOG_FILE.tmp" "$LOG_FILE"
+}
+
+log_change() {
+	local iface="$1" old="$2" new="$3" ts="$4"
+
+	printf '%s\t%s\t%s\t%s\t%s\n' \
+		"$ts" "$(fmt_ts "$ts")" "$iface" "${old:--}" "$new" >> "$LOG_FILE"
+
+	logger -t "$NAME" "interface $iface address changed: ${old:-none} -> $new" 2>/dev/null
+
+	trim_log
+}
+
+# --- status.json -----------------------------------------------------------
+
+status_write() {
+	# $1 = unix timestamp of this run, $2 = temp file with "iface addr ts" lines
+	local now="$1" entries="$2" tmp="$STATUS_FILE.tmp" out first=1 iface addr ts
+
+	out="{\"now\":$now,\"interfaces\":["
+	while read -r iface addr ts; do
+		[ -n "$iface" ] || continue
+		[ "$first" = "1" ] || out="$out,"
+		first=0
+		if [ "$addr" = "-" ] || [ -z "$addr" ]; then
+			out="$out{\"interface\":\"$iface\",\"address\":\"\",\"changed\":0,\"changed_str\":\"-\",\"up\":false}"
+		else
+			out="$out{\"interface\":\"$iface\",\"address\":\"$addr\",\"changed\":${ts:-0},\"changed_str\":\"$(fmt_ts "$ts")\",\"up\":true}"
+		fi
+	done < "$entries"
+	out="$out]}"
+
+	printf '%s' "$out" > "$tmp" && mv "$tmp" "$STATUS_FILE"
+}
+
+# --- actions ---------------------------------------------------------------
+
+do_check() {
+	local now iface addr old ts
+	local entries="$DATA_DIR/.entries.tmp"
+
+	mkdir -p "$DATA_DIR"
+	: > "$entries"
+
+	now="$(date +%s)"
+	network_flush_cache
+
+	for iface in $(monitored_interfaces); do
+		addr="$(interface_ip "$iface")"
+		ts="$(state_field "$iface" 3)"
+		old="$(state_field "$iface" 2)"
+
+		if [ -z "$addr" ]; then
+			# interface has no address (down) - keep the last known state
+			printf '%s %s %s\n' "$iface" "-" "${ts:-0}" >> "$entries"
+			continue
+		fi
+
+		if [ "$addr" != "$old" ]; then
+			log_change "$iface" "$old" "$addr" "$now"
+			state_update "$iface" "$addr" "$now"
+			ts="$now"
+		fi
+
+		printf '%s %s %s\n' "$iface" "$addr" "${ts:-$now}" >> "$entries"
+	done
+
+	status_write "$now" "$entries"
+	rm -f "$entries"
+}
+
+do_clear() {
+	mkdir -p "$DATA_DIR"
+	: > "$LOG_FILE"
+	: > "$STATE_FILE"
+	do_check
+}
+
+do_daemon() {
+	local interval
+	interval="$(conf_get interval)"
+	case "$interval" in
+		''|*[!0-9]*) interval=30 ;;
+	esac
+	[ "$interval" -ge 1 ] || interval=30
+
+	while :; do
+		is_enabled || exit 0
+		if lock_acquire; then
+			do_check
+			lock_release
+		fi
+		sleep "$interval"
+	done
+}
+
+do_status() {
+	[ -f "$STATUS_FILE" ] && cat "$STATUS_FILE"
+	echo
+}
+
+usage() {
+	echo "Usage: $0 {check|clear|daemon|status|interfaces}" >&2
+	exit 1
+}
+
+case "$1" in
+	check)
+		is_enabled || exit 0
+		lock_acquire && { do_check; lock_release; }
+		;;
+	clear)
+		lock_acquire && { do_clear; lock_release; }
+		;;
+	daemon)
+		do_daemon
+		;;
+	status)
+		do_status
+		;;
+	interfaces)
+		monitored_interfaces
+		;;
+	*)
+		usage
+		;;
+esac
+
+exit 0

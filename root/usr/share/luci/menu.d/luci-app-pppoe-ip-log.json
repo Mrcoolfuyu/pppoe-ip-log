@@ -1,0 +1,36 @@
+{
+	"admin/network/pppoe-ip-log": {
+		"title": "PPPoE IP Log",
+		"order": 60,
+		"action": {
+			"type": "firstchild"
+		},
+		"depends": {
+			"acl": [ "luci-app-pppoe-ip-log" ]
+		}
+	},
+
+	"admin/network/pppoe-ip-log/log": {
+		"title": "IP Change Log",
+		"order": 1,
+		"action": {
+			"type": "view",
+			"path": "pppoe-ip-log/log"
+		},
+		"depends": {
+			"acl": [ "luci-app-pppoe-ip-log" ]
+		}
+	},
+
+	"admin/network/pppoe-ip-log/settings": {
+		"title": "Settings",
+		"order": 2,
+		"action": {
+			"type": "view",
+			"path": "pppoe-ip-log/settings"
+		},
+		"depends": {
+			"acl": [ "luci-app-pppoe-ip-log" ]
+		}
+	}
+}
