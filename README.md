@@ -28,7 +28,7 @@ system logs.
 - Web UI under **Network → PPPoE IP Log** with a current-status panel and a
   change-history table, plus a "Clear log" action.
 - The change history lists the address after each change (no old/new pairing).
-- The installed package version is shown in the page title (e.g. `v1.2`).
+- The installed package version is shown in the page title (e.g. `v1.3`).
 - Simplified Chinese translation included (`luci-i18n-pppoe-ip-log-zh-cn`).
 
 ## Installation
@@ -83,7 +83,7 @@ make package/luci-app-pppoe-ip-log/compile V=s
 ```
 
 The build produces two `.ipk` files whose names embed the version and
-architecture (e.g. `luci-app-pppoe-ip-log_1.2_x86_64.ipk`):
+architecture (e.g. `luci-app-pppoe-ip-log_1.3_x86_64.ipk`):
 
 - `luci-app-pppoe-ip-log_*.ipk` — the application (English strings).
 - `luci-i18n-pppoe-ip-log-zh-cn_*.ipk` — Simplified Chinese translation
