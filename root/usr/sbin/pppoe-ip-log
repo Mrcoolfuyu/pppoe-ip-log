@@ -31,16 +31,29 @@ is_enabled() {
 }
 
 lock_acquire() {
-	local i=0
-	while ! mkdir "$LOCK_DIR" 2>/dev/null; do
-		i=$((i + 1))
-		[ "$i" -ge "$LOCK_TRIES" ] && return 1
-		sleep 1
+	local i=0 hp
+	while true; do
+		if mkdir "$LOCK_DIR" 2>/dev/null; then
+			echo $$ > "$LOCK_DIR/pid"
+			return 0
+		fi
+		# Lock already held - find out whether the holder is still alive.
+		hp="$(cat "$LOCK_DIR/pid" 2>/dev/null)"
+		if [ -n "$hp" ] && kill -0 "$hp" 2>/dev/null; then
+			# Live holder: wait, bounded by LOCK_TRIES.
+			i=$((i + 1))
+			[ "$i" -ge "$LOCK_TRIES" ] && return 1
+			sleep 1
+		else
+			# Stale lock left behind by a dead process: clear and retry.
+			rm -rf "$LOCK_DIR" 2>/dev/null
+		fi
 	done
-	return 0
+	return 1
 }
 
 lock_release() {
+	rm -f "$LOCK_DIR/pid" 2>/dev/null
 	rmdir "$LOCK_DIR" 2>/dev/null
 }
 
@@ -114,6 +127,13 @@ public_ip() {
 	return 0
 }
 
+# Report the installed package version (taken from the opkg control file).
+# Returns empty when the control file is unavailable.
+pkg_version() {
+	local f="/usr/lib/opkg/info/luci-app-pppoe-ip-log.control"
+	[ -f "$f" ] && sed -n 's/^Version: //p' "$f" 2>/dev/null
+}
+
 state_field() {
 	# $1 = interface, $2 = field (2 = ifaddr, 3 = public addr, 4 = unix ts)
 	[ -f "$STATE_FILE" ] || return 0
@@ -176,8 +196,9 @@ log_change() {
 status_write() {
 	# $1 = unix timestamp of this run, $2 = temp file with "iface ifaddr pubaddr ts" lines
 	local now="$1" entries="$2" tmp="$STATUS_FILE.tmp" out first=1 iface ifaddr pubaddr ts
+	local ver="$(pkg_version)"
 
-	out="{\"now\":$now,\"interfaces\":["
+	out="{\"now\":$now,\"version\":\"$ver\",\"interfaces\":["
 	while read -r iface ifaddr pubaddr ts; do
 		[ -n "$iface" ] || continue
 		[ "$first" = "1" ] || out="$out,"

@@ -1,3 +1,5 @@
+[English](README.md) | [简体中文](README.zh.md)
+
 # luci-app-pppoe-ip-log
 
 A LuCI application for OpenWrt / ImmortalWrt that records the public IPv4
@@ -24,6 +26,7 @@ system logs.
   address (100.64.0.0/10). Both values are recorded and shown in the UI.
 - Web UI under **Network → PPPoE IP Log** with a current-status panel and a
   change-history table, plus a "Clear log" action.
+- The installed package version is shown in the page title (e.g. `v1.0-r4`).
 - Simplified Chinese translation included (`luci-i18n-pppoe-ip-log-zh-cn`).
 
 ## Installation
@@ -64,7 +67,7 @@ Settings (Network → PPPoE IP Log → Settings):
 - Data is stored in `/etc/pppoe-ip-log/`:
   - `history.log` — tab-separated change records (`epoch<TAB>time<TAB>iface<TAB>old_public<TAB>new_public<TAB>old_interface<TAB>new_interface`).
   - `state` — last known interface and public address per interface.
-  - `status.json` — current status consumed by the web UI (`address` = interface IP, `public_address` = public-facing IP).
+  - `status.json` — current status consumed by the web UI (`address` = interface IP, `public_address` = public-facing IP, `version` = installed package version).
 
 ## Building from source (OpenWrt SDK)
 
@@ -77,7 +80,8 @@ Place this directory at `package/luci-app-pppoe-ip-log` inside an OpenWrt SDK
 make package/luci-app-pppoe-ip-log/compile V=s
 ```
 
-The build produces two `.ipk` files:
+The build produces two `.ipk` files whose names embed the version and
+architecture (e.g. `luci-app-pppoe-ip-log_1.0-r4_x86_64.ipk`):
 
 - `luci-app-pppoe-ip-log_*.ipk` — the application (English strings).
 - `luci-i18n-pppoe-ip-log-zh-cn_*.ipk` — Simplified Chinese translation

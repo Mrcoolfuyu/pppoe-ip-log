@@ -181,7 +181,8 @@ return view.extend({
 		}
 
 		var body = E('div', { 'class': 'cbi-map' }, [
-			E('h2', {}, _('PPPoE IP Log')),
+			E('h2', {}, _('PPPoE IP Log') +
+				((status && status.version) ? ('  (v' + status.version + ')') : '')),
 			E('div', { 'class': 'cbi-section' }, [
 				E('h3', {}, _('Current status')),
 				E('div', { 'id': 'pipl-status' }, this.renderStatus(status))
