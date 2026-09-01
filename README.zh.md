@@ -16,7 +16,7 @@
 - **公网地址探测（兼容 CGNAT，默认关闭）**：除本地接口地址外，还可从外部 echo 服务获取真实对公 IPv4 地址，因此即便 WAN 只能看到运营商级 NAT 地址（100.64.0.0/10）也能记录有效信息。两个值都会被记录；仅当开启该选项时，界面才显示公网地址列。
 - Web 界面位于 **网络 → PPPoE IP Log**，包含当前状态面板、变更历史表格，以及“清空日志”操作。
 - 变更历史只展示每次变更后的新地址（不再区分旧/新地址）。
-- 界面标题处显示当前已安装版本号（如 `v1.0-r6`）。
+- 界面标题处显示当前已安装版本号（如 `v1.2`）。
 - 内置简体中文翻译（`luci-i18n-pppoe-ip-log-zh-cn`）。
 
 ## 安装
@@ -66,7 +66,7 @@ opkg install luci-i18n-pppoe-ip-log-zh-cn
 make package/luci-app-pppoe-ip-log/compile V=s
 ```
 
-编译产物包含两个 `.ipk` 文件，文件名中带有版本号与架构（例如 `luci-app-pppoe-ip-log_1.0-r6_x86_64.ipk`）：
+编译产物包含两个 `.ipk` 文件，文件名中带有版本号与架构（例如 `luci-app-pppoe-ip-log_1.2_x86_64.ipk`）：
 
 - `luci-app-pppoe-ip-log_*.ipk` — 应用本体（英文字符串）。
 - `luci-i18n-pppoe-ip-log-zh-cn_*.ipk` — 简体中文翻译（由 `po/zh_Hans` 自动生成）。

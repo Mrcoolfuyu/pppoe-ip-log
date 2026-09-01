@@ -7,7 +7,7 @@
 # querying an external echo service (useful when the WAN sits behind CGNAT and
 # only a 100.64.0.0/10 carrier-grade NAT address is visible locally).
 #
-# Copyright (C) 2026  WorkBuddy
+# Copyright (C) 2026  Mrcool <ns.mrcool@gmail.com>
 # Released under the Apache License, Version 2.0
 
 . /lib/functions.sh
@@ -129,26 +129,49 @@ public_ip() {
 
 # Report the installed package version (taken from the opkg control file).
 # Returns empty when the control file is unavailable.
+#
+# The build always keeps PKG_RELEASE at 1, so the control file reads "1.2-r1".
+# Versions are maintained by bumping PKG_VERSION only (1.2, 1.3, ...), so the
+# constant release suffix is trimmed here and the UI simply shows "1.2".
 pkg_version() {
-	local f="/usr/lib/opkg/info/luci-app-pppoe-ip-log.control"
-	[ -f "$f" ] && sed -n 's/^Version: //p' "$f" 2>/dev/null
+	local f="/usr/lib/opkg/info/luci-app-pppoe-ip-log.control" v
+	[ -f "$f" ] || return 0
+	v="$(sed -n 's/^Version: //p' "$f" 2>/dev/null | head -1)"
+	echo "${v%-r1}"
 }
 
+# --- state file ------------------------------------------------------------
+#
+# Format:  <interface> <iface addr> <public addr> <unix ts> <lookup flag>
+#
+# "-" is used as a placeholder for an unknown interface/public address: an
+# empty field would collapse the column and shift the following fields into
+# the wrong slot when the line is read back with `read`.
+#
+# <lookup flag> records whether the public-address lookup was enabled when
+# the entry was written (1) or not (0). It is what makes toggling the option
+# a baseline reset instead of an address change - see do_check().
+#
+# Older releases wrote 3 columns (r1) or 4 columns (r2-r7); both are still
+# read correctly below, so an upgrade never mistakes a timestamp for an
+# address and never emits a bogus history entry.
+
 state_field() {
-	# $1 = interface, $2 = field (2 = ifaddr, 3 = public addr, 4 = unix ts)
+	# $1 = interface, $2 = field (2 = ifaddr, 3 = public addr, 4 = unix ts,
+	# 5 = lookup flag)
 	[ -f "$STATE_FILE" ] || return 0
 	awk -v iface="$1" -v field="$2" '$1 == iface { print $field; exit }' "$STATE_FILE"
 }
 
 state_update() {
-	local iface="$1" ifaddr="$2" pubaddr="$3" ts="$4" tmp="$STATE_FILE.tmp"
+	local iface="$1" ifaddr="$2" pubaddr="$3" ts="$4" lookup="$5" tmp="$STATE_FILE.tmp"
 
 	if [ -f "$STATE_FILE" ]; then
 		grep -v "^$iface " "$STATE_FILE" > "$tmp" 2>/dev/null
 	else
 		: > "$tmp"
 	fi
-	printf '%s %s %s %s\n' "$iface" "$ifaddr" "$pubaddr" "$ts" >> "$tmp"
+	printf '%s %s %s %s %s\n' "$iface" "${ifaddr:--}" "${pubaddr:--}" "${ts:-0}" "${lookup:-0}" >> "$tmp"
 	mv "$tmp" "$STATE_FILE"
 }
 
@@ -223,7 +246,9 @@ status_write() {
 # --- actions ---------------------------------------------------------------
 
 do_check() {
-	local now iface ifaddr old_if old_pub old_ts pubaddr new_pub entries="$DATA_DIR/.entries.tmp"
+	local now iface ifaddr old_if old_pub old_ts old_lookup lookup_now=0
+	local pubaddr new_pub pub_cmp changed sline sf pip
+	local entries="$DATA_DIR/.entries.tmp"
 
 	mkdir -p "$DATA_DIR"
 	: > "$entries"
@@ -235,9 +260,10 @@ do_check() {
 	# When the lookup is disabled (or every echo URL fails) use "-" as a
 	# placeholder: an empty field would collapse this column in the state and
 	# entries files, shifting the timestamp into the public-address slot.
+	[ "$(conf_get public_ip_lookup)" != "0" ] && lookup_now=1
+
 	pubaddr="-"
-	if [ "$(conf_get public_ip_lookup)" != "0" ]; then
-		local pip
+	if [ "$lookup_now" = "1" ]; then
 		pip="$(public_ip)"
 		[ -n "$pip" ] && pubaddr="$pip"
 	fi
@@ -253,12 +279,12 @@ do_check() {
 		fi
 
 		# Read previous state. Tolerate the legacy 3-column format written
-		# by r1 ("iface ifaddr ts"), which has no public-address column, so
-		# that upgrading from r1 does not misread the old timestamp as a
-		# public address.
-		local sline sf
+		# by r1 ("iface ifaddr ts") and the 4-column format of r2-r7
+		# ("iface ifaddr pubaddr ts"), neither of which carries the lookup
+		# flag, so that upgrading never misreads a timestamp as an address.
 		sline="$(awk -v i="$iface" '$1==i{print;exit}' "$STATE_FILE" 2>/dev/null)"
 		sf="$(printf '%s' "$sline" | wc -w)"
+		old_lookup=""
 		if [ "$sf" = "3" ]; then
 			old_if="$(printf '%s' "$sline" | awk '{print $2}')"
 			old_pub=""
@@ -267,17 +293,38 @@ do_check() {
 			old_if="$(printf '%s' "$sline" | awk '{print $2}')"
 			old_pub="$(printf '%s' "$sline" | awk '{print $3}')"
 			old_ts="$(printf '%s' "$sline" | awk '{print $4}')"
+			[ "$sf" -ge 5 ] && old_lookup="$(printf '%s' "$sline" | awk '{print $5}')"
 		fi
+		[ "$old_if" = "-" ] && old_if=""
 		[ "$old_pub" = "-" ] && old_pub=""
+		[ "$old_lookup" = "-" ] && old_lookup=""
 
 		new_pub="$pubaddr"
 		[ "$new_pub" = "-" ] && new_pub=""
 
-		if [ "$ifaddr" != "$old_if" ] || [ "$new_pub" != "$old_pub" ]; then
+		# The public address may only be compared when the previous *and*
+		# the current run both resolved one with the lookup enabled.
+		# Enabling/disabling the option therefore just re-baselines the
+		# stored value instead of creating a history entry, and a transient
+		# failure of every echo URL is not reported as a change either.
+		pub_cmp=0
+		if [ "$lookup_now" = "1" ] && [ "$old_lookup" = "1" ] \
+			&& [ -n "$new_pub" ] && [ -n "$old_pub" ]; then
+			pub_cmp=1
+		fi
+
+		changed=0
+		[ "$ifaddr" != "$old_if" ] && changed=1
+		[ "$pub_cmp" = "1" ] && [ "$new_pub" != "$old_pub" ] && changed=1
+
+		if [ "$changed" = "1" ]; then
 			log_change "$iface" "$old_if" "$old_pub" "$ifaddr" "$pubaddr" "$now"
-			state_update "$iface" "$ifaddr" "$pubaddr" "$now"
 			old_ts="$now"
 		fi
+
+		# Always rewrite the state: it carries the lookup flag and the
+		# current baseline even when nothing was logged.
+		state_update "$iface" "$ifaddr" "$pubaddr" "${old_ts:-$now}" "$lookup_now"
 
 		printf '%s %s %s %s\n' "$iface" "$ifaddr" "$pubaddr" "${old_ts:-$now}" >> "$entries"
 	done

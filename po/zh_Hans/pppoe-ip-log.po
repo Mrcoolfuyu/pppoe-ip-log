@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "PO-Revision-Date: 2026-09-01 08:30+0000\n"
-"Last-Translator: WorkBuddy <workbuddy@local>\n"
+"Last-Translator: Mrcool <ns.mrcool@gmail.com>\n"
 "Language-Team: Chinese (Simplified Han script)\n"
 "Language: zh_Hans\n"
 "Content-Type: text/plain; charset=UTF-8\n"
