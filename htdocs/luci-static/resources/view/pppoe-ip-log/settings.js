@@ -59,6 +59,17 @@ return view.extend({
 		o.default = '500';
 		o.rmempty = false;
 
+		o = s.option(form.Flag, 'public_ip_lookup', _('Query public IP address'),
+			_('Also discover the public-facing IPv4 address from an external echo service. ' +
+			  'Useful when the WAN sits behind carrier-grade NAT (CGNAT) and only a 100.64.0.0/10 address is visible locally.'));
+		o.default = '1';
+		o.rmempty = false;
+
+		o = s.option(form.DynamicList, 'echo_url', _('Public IP echo URL(s)'),
+			_('One or more URLs that return the caller IPv4 address as plain text. ' +
+			  'They are tried in order until one succeeds.'));
+		o.rmempty = true;
+
 		return m.render();
 	}
 });

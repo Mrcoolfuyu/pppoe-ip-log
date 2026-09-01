@@ -2,7 +2,10 @@
 # pppoe-ip-log - record public IP address changes of PPPoE / WAN interfaces
 #
 # Records the time, the previous address and the new address whenever the
-# public IPv4 address of a monitored (PPPoE) interface changes.
+# public IPv4 address of a monitored (PPPoE) interface changes. In addition to
+# the interface address it can also discover the public-facing address by
+# querying an external echo service (useful when the WAN sits behind CGNAT and
+# only a 100.64.0.0/10 carrier-grade NAT address is visible locally).
 #
 # Copyright (C) 2026  WorkBuddy
 # Released under the Apache License, Version 2.0
@@ -78,21 +81,54 @@ interface_ip() {
 	[ -n "$addr" ] && echo "$addr"
 }
 
+# Fetch a URL and print the first IPv4 address found in the body.
+fetch_url() {
+	local url="$1" out=""
+
+	if command -v uclient-fetch >/dev/null 2>&1; then
+		out="$(uclient-fetch -q -T 4 -O - "$url" 2>/dev/null)"
+	elif command -v wget >/dev/null 2>&1; then
+		out="$(wget -q -T 4 -O - "$url" 2>/dev/null)"
+	elif command -v curl >/dev/null 2>&1; then
+		out="$(curl -s --max-time 4 "$url" 2>/dev/null)"
+	fi
+
+	[ -n "$out" ] && echo "$out" | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | head -1
+}
+
+# Discover the public-facing IPv4 address. Returns empty when the lookup is
+# disabled or every echo URL fails (so the caller just logs the interface IP).
+public_ip() {
+	local urls url ip
+
+	[ "$(conf_get public_ip_lookup)" = "0" ] && return 0
+
+	urls="$(conf_get echo_url)"
+	[ -n "$urls" ] || urls="http://api.ipify.org http://ifconfig.me/ip http://ipinfo.io/ip http://ipecho.net/plain https://api.ipify.org"
+
+	for url in $urls; do
+		ip="$(fetch_url "$url")"
+		[ -n "$ip" ] && { echo "$ip"; return 0; }
+	done
+
+	return 0
+}
+
 state_field() {
-	# $1 = interface, $2 = field (2 = address, 3 = unix timestamp)
+	# $1 = interface, $2 = field (2 = ifaddr, 3 = public addr, 4 = unix ts)
 	[ -f "$STATE_FILE" ] || return 0
 	awk -v iface="$1" -v field="$2" '$1 == iface { print $field; exit }' "$STATE_FILE"
 }
 
 state_update() {
-	local iface="$1" addr="$2" ts="$3" tmp="$STATE_FILE.tmp"
+	local iface="$1" ifaddr="$2" pubaddr="$3" ts="$4" tmp="$STATE_FILE.tmp"
 
 	if [ -f "$STATE_FILE" ]; then
 		grep -v "^$iface " "$STATE_FILE" > "$tmp" 2>/dev/null
 	else
 		: > "$tmp"
 	fi
-	printf '%s %s %s\n' "$iface" "$addr" "$ts" >> "$tmp"
+	printf '%s %s %s %s\n' "$iface" "$ifaddr" "$pubaddr" "$ts" >> "$tmp"
 	mv "$tmp" "$STATE_FILE"
 }
 
@@ -121,13 +157,16 @@ trim_log() {
 	tail -n "$max" "$LOG_FILE" > "$LOG_FILE.tmp" && mv "$LOG_FILE.tmp" "$LOG_FILE"
 }
 
+# history.log columns: epoch  datestr  iface  old_pub  new_pub  old_if  new_if
 log_change() {
-	local iface="$1" old="$2" new="$3" ts="$4"
+	local iface="$1" old_if="$2" old_pub="$3" new_if="$4" new_pub="$5" ts="$6"
 
-	printf '%s\t%s\t%s\t%s\t%s\n' \
-		"$ts" "$(fmt_ts "$ts")" "$iface" "${old:--}" "$new" >> "$LOG_FILE"
+	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+		"$ts" "$(fmt_ts "$ts")" "$iface" \
+		"${old_pub:--}" "${new_pub:--}" \
+		"${old_if:--}" "${new_if:--}" >> "$LOG_FILE"
 
-	logger -t "$NAME" "interface $iface address changed: ${old:-none} -> $new" 2>/dev/null
+	logger -t "$NAME" "interface $iface IP changed: if ${old_if:-none}->${new_if:-none}, public ${old_pub:-none}->${new_pub:-none}" 2>/dev/null
 
 	trim_log
 }
@@ -135,30 +174,30 @@ log_change() {
 # --- status.json -----------------------------------------------------------
 
 status_write() {
-	# $1 = unix timestamp of this run, $2 = temp file with "iface addr ts" lines
-	local now="$1" entries="$2" tmp="$STATUS_FILE.tmp" out first=1 iface addr ts
+	# $1 = unix timestamp of this run, $2 = temp file with "iface ifaddr pubaddr ts" lines
+	local now="$1" entries="$2" tmp="$STATUS_FILE.tmp" out first=1 iface ifaddr pubaddr ts
 
 	out="{\"now\":$now,\"interfaces\":["
-	while read -r iface addr ts; do
+	while read -r iface ifaddr pubaddr ts; do
 		[ -n "$iface" ] || continue
 		[ "$first" = "1" ] || out="$out,"
 		first=0
-		if [ "$addr" = "-" ] || [ -z "$addr" ]; then
-			out="$out{\"interface\":\"$iface\",\"address\":\"\",\"changed\":0,\"changed_str\":\"-\",\"up\":false}"
+		if [ -z "$ifaddr" ] || [ "$ifaddr" = "-" ]; then
+			out="$out{\"interface\":\"$iface\",\"address\":\"\",\"public_address\":\"\",\"changed\":0,\"changed_str\":\"-\",\"up\":false}"
 		else
-			out="$out{\"interface\":\"$iface\",\"address\":\"$addr\",\"changed\":${ts:-0},\"changed_str\":\"$(fmt_ts "$ts")\",\"up\":true}"
+			out="$out{\"interface\":\"$iface\",\"address\":\"$ifaddr\",\"public_address\":\"$pubaddr\",\"changed\":${ts:-0},\"changed_str\":\"$(fmt_ts "$ts")\",\"up\":true}"
 		fi
 	done < "$entries"
 	out="$out]}"
-
-	printf '%s' "$out" > "$tmp" && mv "$tmp" "$STATUS_FILE"
+	if [ -n "$out" ]; then
+		printf '%s' "$out" > "$tmp" && mv "$tmp" "$STATUS_FILE"
+	fi
 }
 
 # --- actions ---------------------------------------------------------------
 
 do_check() {
-	local now iface addr old ts
-	local entries="$DATA_DIR/.entries.tmp"
+	local now iface ifaddr old_if old_pub old_ts pubaddr entries="$DATA_DIR/.entries.tmp"
 
 	mkdir -p "$DATA_DIR"
 	: > "$entries"
@@ -166,24 +205,44 @@ do_check() {
 	now="$(date +%s)"
 	network_flush_cache
 
-	for iface in $(monitored_interfaces); do
-		addr="$(interface_ip "$iface")"
-		ts="$(state_field "$iface" 3)"
-		old="$(state_field "$iface" 2)"
+	# The public address is per-router, not per-interface, so query it once.
+	pubaddr=""
+	[ "$(conf_get public_ip_lookup)" != "0" ] && pubaddr="$(public_ip)"
 
-		if [ -z "$addr" ]; then
+	for iface in $(monitored_interfaces); do
+		ifaddr="$(interface_ip "$iface")"
+
+		if [ -z "$ifaddr" ]; then
 			# interface has no address (down) - keep the last known state
-			printf '%s %s %s\n' "$iface" "-" "${ts:-0}" >> "$entries"
+			old_ts="$(state_field "$iface" 4)"
+			printf '%s %s %s %s\n' "$iface" "-" "-" "${old_ts:-0}" >> "$entries"
 			continue
 		fi
 
-		if [ "$addr" != "$old" ]; then
-			log_change "$iface" "$old" "$addr" "$now"
-			state_update "$iface" "$addr" "$now"
-			ts="$now"
+		# Read previous state. Tolerate the legacy 3-column format written
+		# by r1 ("iface ifaddr ts"), which has no public-address column, so
+		# that upgrading from r1 does not misread the old timestamp as a
+		# public address.
+		local sline sf
+		sline="$(awk -v i="$iface" '$1==i{print;exit}' "$STATE_FILE" 2>/dev/null)"
+		sf="$(printf '%s' "$sline" | wc -w)"
+		if [ "$sf" = "3" ]; then
+			old_if="$(printf '%s' "$sline" | awk '{print $2}')"
+			old_pub=""
+			old_ts="$(printf '%s' "$sline" | awk '{print $3}')"
+		else
+			old_if="$(printf '%s' "$sline" | awk '{print $2}')"
+			old_pub="$(printf '%s' "$sline" | awk '{print $3}')"
+			old_ts="$(printf '%s' "$sline" | awk '{print $4}')"
 		fi
 
-		printf '%s %s %s\n' "$iface" "$addr" "${ts:-$now}" >> "$entries"
+		if [ "$ifaddr" != "$old_if" ] || [ "$pubaddr" != "$old_pub" ]; then
+			log_change "$iface" "$old_if" "$old_pub" "$ifaddr" "$pubaddr" "$now"
+			state_update "$iface" "$ifaddr" "$pubaddr" "$now"
+			old_ts="$now"
+		fi
+
+		printf '%s %s %s %s\n' "$iface" "$ifaddr" "$pubaddr" "${old_ts:-$now}" >> "$entries"
 	done
 
 	status_write "$now" "$entries"

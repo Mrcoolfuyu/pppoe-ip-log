@@ -131,3 +131,39 @@ msgstr "最大日志条数"
 #: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:61
 msgid "The oldest entries are discarded when this limit is reached. Use 0 for unlimited."
 msgstr "达到该上限后最早的条目会被丢弃。填 0 表示不限制。"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:66
+msgid "Query public IP address"
+msgstr "查询公网地址"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:67
+msgid "Also discover the public-facing IPv4 address from an external echo service. Useful when the WAN sits behind carrier-grade NAT (CGNAT) and only a 100.64.0.0/10 address is visible locally."
+msgstr "同时借助外部回声服务探测出口公网 IPv4 地址。当 WAN 位于运营商级 NAT（CGNAT）之后、本地只能看到 100.64.0.0/10 地址时很有用。"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:72
+msgid "Public IP echo URL(s)"
+msgstr "公网地址探测地址"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/settings.js:73
+msgid "One or more URLs that return the caller IPv4 address as plain text. They are tried in order until one succeeds."
+msgstr "一个或多个以纯文本形式返回调用方 IPv4 地址的 URL，按顺序尝试直到其中一个成功。"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:93
+msgid "Public address"
+msgstr "公网地址"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:121
+msgid "Previous public"
+msgstr "原公网地址"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:122
+msgid "New public"
+msgstr "新公网地址"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:123
+msgid "Interface IP"
+msgstr "接口 IP"
+
+#: htdocs/luci-static/resources/view/pppoe-ip-log/log.js:130
+msgid "unknown"
+msgstr "未知"

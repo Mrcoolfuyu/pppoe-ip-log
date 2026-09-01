@@ -21,13 +21,28 @@ function parseLog(text) {
 		if (f.length < 5)
 			continue;
 
-		rows.push({
-			epoch: parseInt(f[0], 10),
-			time: f[1],
-			iface: f[2],
-			prev: f[3],
-			next: f[4]
-		});
+		if (f.length >= 7) {
+			rows.push({
+				epoch: parseInt(f[0], 10),
+				time: f[1],
+				iface: f[2],
+				prevPub: f[3],
+				nextPub: f[4],
+				prevIf: f[5],
+				nextIf: f[6]
+			});
+		} else {
+			/* legacy format: interface address only */
+			rows.push({
+				epoch: parseInt(f[0], 10),
+				time: f[1],
+				iface: f[2],
+				prevPub: null,
+				nextPub: null,
+				prevIf: f[3],
+				nextIf: f[4]
+			});
+		}
 	}
 
 	return rows;
@@ -91,13 +106,14 @@ return view.extend({
 		    tbl = table([
 				_('Interface'),
 				_('Current address'),
+				_('Public address'),
 				_('Since'),
 				_('Held for')
 			]),
 		    i, it, held;
 
 		if (ifaces.length === 0)
-			return emptyRow(tbl, 4, _('No data available.'));
+			return emptyRow(tbl, 5, _('No data available.'));
 
 		for (i = 0; i < ifaces.length; i++) {
 			it = ifaces[i];
@@ -108,6 +124,8 @@ return view.extend({
 				E('td', { 'class': 'td' }, it.up ?
 					E('strong', {}, it.address || '-') :
 					E('em', {}, _('no address'))),
+				E('td', { 'class': 'td' }, (it.up && it.public_address) ?
+					it.public_address : E('em', {}, _('unknown'))),
 				E('td', { 'class': 'td' }, (it.up && it.changed_str) ? it.changed_str : '-'),
 				E('td', { 'class': 'td' }, (it.up && held) ? held : '-')
 			]));
@@ -120,22 +138,32 @@ return view.extend({
 		var tbl = table([
 				_('Time'),
 				_('Interface'),
-				_('Previous address'),
-				_('New address')
+				_('Previous public'),
+				_('New public'),
+				_('Interface IP')
 			]),
-		    i, r;
+		    i, r, ifText;
 
 		if (rows.length === 0)
-			return emptyRow(tbl, 4, _('No address changes have been recorded yet.'));
+			return emptyRow(tbl, 6, _('No address changes have been recorded yet.'));
 
 		/* newest first */
 		for (i = rows.length - 1; i >= 0; i--) {
 			r = rows[i];
+			ifText = [
+				(r.prevIf && r.prevIf !== '-') ? r.prevIf : _('none'),
+				' → ',
+				r.nextIf || '-'
+			];
+
 			tbl.appendChild(E('tr', { 'class': 'tr' }, [
 				E('td', { 'class': 'td' }, r.time || '-'),
 				E('td', { 'class': 'td' }, r.iface || '-'),
-				E('td', { 'class': 'td' }, (r.prev && r.prev !== '-') ? r.prev : E('em', {}, _('none'))),
-				E('td', { 'class': 'td' }, E('strong', {}, r.next || '-'))
+				E('td', { 'class': 'td' }, (r.prevPub && r.prevPub !== '-') ?
+					r.prevPub : E('em', {}, _('unknown'))),
+				E('td', { 'class': 'td' }, E('strong', {}, (r.nextPub && r.nextPub !== '-') ?
+					r.nextPub : E('em', {}, _('unknown')))),
+				E('td', { 'class': 'td' }, ifText)
 			]));
 		}
 
