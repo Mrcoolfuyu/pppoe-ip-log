@@ -127,17 +127,34 @@ public_ip() {
 	return 0
 }
 
-# Report the installed package version (taken from the opkg control file).
-# Returns empty when the control file is unavailable.
+# Report the installed package version, or an empty string when neither
+# package database is readable.
 #
-# The build always keeps PKG_RELEASE at 1, so the control file reads "1.2-r1".
-# Versions are maintained by bumping PKG_VERSION only (1.2, 1.3, ...), so the
-# constant release suffix is trimmed here and the UI simply shows "1.2".
+# OpenWrt 24.10 and earlier ship opkg: the version lives in
+#   /usr/lib/opkg/info/luci-app-pppoe-ip-log.control   ->  "Version: 1.4-r1"
+# OpenWrt 25.12 and later replace opkg with apk: the installed database is
+#   /lib/apk/db/installed                              ->  "P:<pkg>" / "V:1.4-r1"
+# so both layouts are probed, opkg first, then apk.
+#
+# The build always keeps PKG_RELEASE at 1, so the recorded version reads
+# "1.4-r1". Versions are maintained by bumping PKG_VERSION only (1.2, 1.3,
+# ...), so the release suffix is trimmed here and the UI simply shows "1.4".
 pkg_version() {
-	local f="/usr/lib/opkg/info/luci-app-pppoe-ip-log.control" v
-	[ -f "$f" ] || return 0
-	v="$(sed -n 's/^Version: //p' "$f" 2>/dev/null | head -1)"
-	echo "${v%-r1}"
+	local f="/usr/lib/opkg/info/luci-app-pppoe-ip-log.control" db v=""
+
+	if [ -f "$f" ]; then
+		v="$(sed -n 's/^Version: //p' "$f" 2>/dev/null | head -1)"
+	fi
+
+	if [ -z "$v" ]; then
+		for db in /lib/apk/db/installed /usr/lib/apk/db/installed; do
+			[ -f "$db" ] || continue
+			v="$(awk '/^P:/{f=0} /^P:luci-app-pppoe-ip-log$/{f=1; next} f==1 && /^V:/{sub(/^V:/,""); print; exit}' "$db" 2>/dev/null)"
+			[ -n "$v" ] && break
+		done
+	fi
+
+	echo "${v%-r[0-9]*}"
 }
 
 # --- state file ------------------------------------------------------------

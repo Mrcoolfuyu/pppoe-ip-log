@@ -28,12 +28,28 @@ system logs.
 - Web UI under **Network → PPPoE IP Log** with a current-status panel and a
   change-history table, plus a "Clear log" action.
 - The change history lists the address after each change (no old/new pairing).
-- The installed package version is shown in the page title (e.g. `v1.3`).
+- The installed package version is shown in the page title (e.g. `v1.4`).
 - Simplified Chinese translation included (`luci-i18n-pppoe-ip-log-zh-cn`).
 
 ## Installation
 
-Install both the application and the translation package:
+Install both the application and the translation package.
+
+**OpenWrt 25.12 and newer — apk:**
+
+```sh
+apk update
+apk add luci-app-pppoe-ip-log luci-i18n-pppoe-ip-log-zh-cn
+```
+
+For a manually downloaded (unsigned) `.apk` from the releases page:
+
+```sh
+apk add --allow-untrusted /tmp/luci-app-pppoe-ip-log_1.4_*.apk \
+                         /tmp/luci-i18n-pppoe-ip-log-zh-cn_*.apk
+```
+
+**OpenWrt 24.10 and earlier — opkg:**
 
 ```sh
 opkg update
@@ -74,7 +90,7 @@ Settings (Network → PPPoE IP Log → Settings):
 ## Building from source (OpenWrt SDK)
 
 Place this directory at `package/luci-app-pppoe-ip-log` inside an OpenWrt SDK
-(e.g. `openwrt-sdk-24.10.x`) and run:
+(e.g. `openwrt-sdk-24.10.x` or `openwrt-sdk-25.12.x`) and run:
 
 ```sh
 ./scripts/feeds update -a
@@ -82,12 +98,18 @@ Place this directory at `package/luci-app-pppoe-ip-log` inside an OpenWrt SDK
 make package/luci-app-pppoe-ip-log/compile V=s
 ```
 
-The build produces two `.ipk` files whose names embed the version and
-architecture (e.g. `luci-app-pppoe-ip-log_1.3_x86_64.ipk`):
+The package format follows the SDK: 24.10 and older emit `.ipk` (opkg), while
+25.12 and newer emit `.apk` (apk-tools, `CONFIG_USE_APK=y`). Either way you get
+two packages whose names embed the version and architecture (e.g.
+`luci-app-pppoe-ip-log_1.4_x86_64.ipk`):
 
-- `luci-app-pppoe-ip-log_*.ipk` — the application (English strings).
-- `luci-i18n-pppoe-ip-log-zh-cn_*.ipk` — Simplified Chinese translation
+- `luci-app-pppoe-ip-log_*` — the application (English strings).
+- `luci-i18n-pppoe-ip-log-zh-cn_*` — Simplified Chinese translation
   (derived automatically from `po/zh_Hans`).
+
+The application reads its own version from the opkg control file on 24.10 and
+from the apk installed database (`/lib/apk/db/installed`) on 25.12, so the
+version shown in the UI works on both.
 
 > Note: the three executable scripts (`root/etc/init.d/pppoe-ip-log`,
 > `root/etc/hotplug.d/iface/95-pppoe-ip-log` and `root/usr/sbin/pppoe-ip-log`)

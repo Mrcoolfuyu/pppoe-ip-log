@@ -5,7 +5,7 @@ LUCI_NAME:=luci-app-pppoe-ip-log
 PKG_NAME:=$(LUCI_NAME)
 # Versioning: bump PKG_VERSION by one on every change (1.3 -> 1.4 -> ...).
 # PKG_RELEASE stays at 1 - do not use it to track changes.
-PKG_VERSION:=1.3
+PKG_VERSION:=1.4
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=Mrcool <ns.mrcool@gmail.com>
@@ -33,6 +33,7 @@ include $(TOPDIR)/feeds/luci/luci.mk
 
 # call BuildPackage - OpenWrt buildroot signature
 
-# The package tree builds two ipk files:
+# The package tree builds two packages (.ipk on OpenWrt <= 24.10 / opkg,
+# .apk on OpenWrt >= 25.12 / apk - the format is decided by the SDK):
 #   luci-app-pppoe-ip-log        - the application itself (English source strings)
 #   luci-i18n-pppoe-ip-log-zh-cn - Simplified Chinese translation (po/zh_Hans)

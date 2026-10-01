@@ -16,12 +16,28 @@
 - **公网地址探测（兼容 CGNAT，默认关闭）**：除本地接口地址外，还可从外部 echo 服务获取真实对公 IPv4 地址，因此即便 WAN 只能看到运营商级 NAT 地址（100.64.0.0/10）也能记录有效信息。两个值都会被记录；仅当开启该选项时，界面才显示公网地址列。
 - Web 界面位于 **网络 → PPPoE IP Log**，包含当前状态面板、变更历史表格，以及“清空日志”操作。
 - 变更历史只展示每次变更后的新地址（不再区分旧/新地址）。
-- 界面标题处显示当前已安装版本号（如 `v1.3`）。
+- 界面标题处显示当前已安装版本号（如 `v1.4`）。
 - 内置简体中文翻译（`luci-i18n-pppoe-ip-log-zh-cn`）。
 
 ## 安装
 
-同时安装应用与翻译包：
+同时安装应用与翻译包。
+
+**OpenWrt 25.12 及更新版本 — apk：**
+
+```sh
+apk update
+apk add luci-app-pppoe-ip-log luci-i18n-pppoe-ip-log-zh-cn
+```
+
+若是从 releases 页面手动下载（未签名）的 `.apk` 文件：
+
+```sh
+apk add --allow-untrusted /tmp/luci-app-pppoe-ip-log_1.4_*.apk \
+                         /tmp/luci-i18n-pppoe-ip-log-zh-cn_*.apk
+```
+
+**OpenWrt 24.10 及更早版本 — opkg：**
 
 ```sh
 opkg update
@@ -58,7 +74,7 @@ opkg install luci-i18n-pppoe-ip-log-zh-cn
 
 ## 从源码编译（OpenWrt SDK）
 
-将本目录放到 OpenWrt SDK（如 `openwrt-sdk-24.10.x`）的 `package/luci-app-pppoe-ip-log`，然后运行：
+将本目录放到 OpenWrt SDK（如 `openwrt-sdk-24.10.x` 或 `openwrt-sdk-25.12.x`）的 `package/luci-app-pppoe-ip-log`，然后运行：
 
 ```sh
 ./scripts/feeds update -a
@@ -66,10 +82,12 @@ opkg install luci-i18n-pppoe-ip-log-zh-cn
 make package/luci-app-pppoe-ip-log/compile V=s
 ```
 
-编译产物包含两个 `.ipk` 文件，文件名中带有版本号与架构（例如 `luci-app-pppoe-ip-log_1.3_x86_64.ipk`）：
+包格式由 SDK 决定：24.10 及更早产出 `.ipk`（opkg），25.12 及更新产出 `.apk`（apk-tools，`CONFIG_USE_APK=y`）。两种情况下都是两个包，文件名带版本号与架构（例如 `luci-app-pppoe-ip-log_1.4_x86_64.ipk`）：
 
-- `luci-app-pppoe-ip-log_*.ipk` — 应用本体（英文字符串）。
-- `luci-i18n-pppoe-ip-log-zh-cn_*.ipk` — 简体中文翻译（由 `po/zh_Hans` 自动生成）。
+- `luci-app-pppoe-ip-log_*` — 应用本体（英文字符串）。
+- `luci-i18n-pppoe-ip-log-zh-cn_*` — 简体中文翻译（由 `po/zh_Hans` 自动生成）。
+
+版本号的读取在两代包管理器下都能工作：24.10 读 opkg 的 control 文件，25.12 读 apk 的已安装数据库（`/lib/apk/db/installed`）。
 
 > 注意：三个可执行脚本（`root/etc/init.d/pppoe-ip-log`、`root/etc/hotplug.d/iface/95-pppoe-ip-log`、`root/usr/sbin/pppoe-ip-log`）必须在仓库中保留可执行位，否则打包安装会出错。
 
